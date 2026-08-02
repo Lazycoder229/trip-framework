@@ -1,8 +1,4 @@
-/**
- * Holds a list of routes per HTTP method, and matches incoming requests
- * to the correct handler. Multiple instances can be created (e.g. one per
- * "module" of the app) and then mounted onto a Trip instance via .use().
- */
+// router.js
 export class Router {
   /**
    * @param {string} [prefix=""] - Path prefix added to all routes registered
@@ -20,16 +16,42 @@ export class Router {
   }
 
   /**
-   * Registers a route under a specific HTTP method.
+   * Registers a route under a specific HTTP method. Compiles the path into
+   * a regex once at registration time (not per-request) for performance,
+   * and extracts any `:param` names along the way.
    * @param {"GET"|"POST"|"PUT"|"DELETE"|"PATCH"} method - The HTTP method.
-   * @param {string} path - The route path (prefix will be prepended).
+   * @param {string} path - The route path (prefix will be prepended). May
+   *   contain `:name` segments, e.g. "/users/:id/posts/:postId".
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    *   The function to run when this route matches.
    * @returns {void}
    */
   add(method, path, handler) {
     const fullPath = this._joinPath(this.prefix, path);
-    this.routes[method].push({ path: fullPath, handler });
+    const { regex, paramNames } = this._compilePath(fullPath);
+    this.routes[method].push({ path: fullPath, handler, regex, paramNames });
+  }
+
+  /**
+   * Compiles a path pattern (e.g. "/users/:id") into a matching regex plus
+   * the ordered list of param names found, so match() can zip captured
+   * groups back into named params later without re-parsing the string.
+   * @param {string} path - The full path pattern, dashes/prefix already applied.
+   * @returns {{ regex: RegExp, paramNames: string[] }}
+   */
+  _compilePath(path) {
+    const paramNames = [];
+
+    // escape regex special chars first, then swap ":name" segments for a
+    // capture group that stops at the next "/" (so params can't span segments)
+    const pattern = path
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&") // escape literal regex chars
+      .replace(/\\:([A-Za-z0-9_]+)/g, (_, name) => {
+        paramNames.push(name);
+        return "([^/]+)";
+      });
+
+    return { regex: new RegExp(`^${pattern}$`), paramNames };
   }
 
   /**
@@ -55,68 +77,48 @@ export class Router {
     }
   }
 
-  /**
-   * Registers a GET route.
-   * @param {string} path - The route path.
-   * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   * @returns {void}
-   */
   get(path, handler) {
     this.add("GET", path, handler);
   }
-
-  /**
-   * Registers a POST route.
-   * @param {string} path - The route path.
-   * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   * @returns {void}
-   */
   post(path, handler) {
     this.add("POST", path, handler);
   }
-
-  /**
-   * Registers a PUT route.
-   * @param {string} path - The route path.
-   * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   * @returns {void}
-   */
   put(path, handler) {
     this.add("PUT", path, handler);
   }
-
-  /**
-   * Registers a DELETE route.
-   * @param {string} path - The route path.
-   * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   * @returns {void}
-   */
   delete(path, handler) {
     this.add("DELETE", path, handler);
   }
-
-  /**
-   * Registers a PATCH route.
-   * @param {string} path - The route path.
-   * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   * @returns {void}
-   */
   patch(path, handler) {
     this.add("PATCH", path, handler);
   }
 
   /**
-   * Finds the route that matches the given method and pathname.
-   * HEAD requests automatically fall back to matching GET routes, since
-   * HEAD is expected to behave like GET but without a response body.
-   * Simple exact match for now; :param support may be added later.
+   * Finds the route that matches the given method and pathname, extracting
+   * any `:param` values along the way. HEAD requests automatically fall
+   * back to matching GET routes, since HEAD is expected to behave like GET
+   * but without a response body.
    * @param {string} method - The HTTP method of the incoming request.
    * @param {string} pathname - The pathname of the incoming request.
-   * @returns {{ path: string, handler: Function } | null} The matched route, or null if none found.
+   * @returns {{ path: string, handler: Function, params: Object<string, string> } | null}
+   *   The matched route (with extracted params), or null if none found.
    */
   match(method, pathname) {
     const lookupMethod = method === "HEAD" ? "GET" : method;
     const routeList = this.routes[lookupMethod] || [];
-    return routeList.find((route) => route.path === pathname) || null;
+
+    for (const route of routeList) {
+      const result = route.regex.exec(pathname);
+      if (!result) continue;
+
+      const params = {};
+      route.paramNames.forEach((name, i) => {
+        params[name] = decodeURIComponent(result[i + 1]);
+      });
+
+      return { path: route.path, handler: route.handler, params };
+    }
+
+    return null;
   }
 }
