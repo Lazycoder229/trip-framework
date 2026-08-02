@@ -1,28 +1,28 @@
 /**
- * Nagpapalawak sa raw Node.js request object gamit ang dagdag na properties
- * (pathname, query params, at lugar para sa route params).
- * @param {import("http").IncomingMessage} req - Ang raw request object mula sa http.createServer.
- * @returns {import("http").IncomingMessage} Yung parehong req object, may bagong properties na.
+ * Enhances the raw Node.js request object with additional properties
+ * (pathname, query params, and a slot for future route params).
+ * @param {import("http").IncomingMessage} req - The raw request object from http.createServer.
+ * @returns {import("http").IncomingMessage} The same req object, now with the new properties.
  */
 export function enhanceRequest(req) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   req.pathname = url.pathname;
   req.query = Object.fromEntries(url.searchParams);
-  req.params = {}; // gagamitin natin to pag nagdagdag na tayo ng :id support
+  req.params = {}; // reserved for future :id route param support
 
   return req;
 }
 
 /**
- * Binabasa at nire-resolve ang buong body ng request (POST/PUT/PATCH payloads).
- * Awtomatikong nagpa-parse bilang JSON kung "application/json" ang Content-Type,
- * kung hindi, ibabalik na lang bilang raw string.
- * @param {import("http").IncomingMessage} req - Ang raw request object na may incoming data stream.
- * @returns {Promise<Object|string>} Ang na-parse na JSON object, o raw string kung hindi JSON.
- * @throws {Error & { statusCode: number, clientError: boolean }} Kapag invalid ang JSON, may
- *   `statusCode: 400` at `clientError: true` na nakalagay sa error para malaman ng server
- *   na kasalanan ito ng client, hindi server error.
+ * Reads and resolves the full body of a request (POST/PUT/PATCH payloads).
+ * Automatically parses as JSON when the Content-Type is "application/json",
+ * otherwise resolves the raw string.
+ * @param {import("http").IncomingMessage} req - The raw request object with an incoming data stream.
+ * @returns {Promise<Object|string>} The parsed JSON object, or the raw string if not JSON.
+ * @throws {Error & { statusCode: number, clientError: boolean }} When the JSON is invalid, the
+ *   error carries `statusCode: 400` and `clientError: true` so the server knows this is a
+ *   client error, not a server error.
  */
 export function parseBody(req) {
   return new Promise((resolve, reject) => {
@@ -41,10 +41,10 @@ export function parseBody(req) {
         if (contentType.includes("application/json")) {
           resolve(JSON.parse(data));
         } else {
-          resolve(data); // raw string kung hindi JSON
+          resolve(data); // raw string if not JSON
         }
       } catch (err) {
-        // markahan bilang client error (400), hindi server error (500)
+        // mark as a client error (400), not a server error (500)
         err.statusCode = 400;
         err.clientError = true;
         reject(err);

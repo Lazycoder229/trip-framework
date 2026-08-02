@@ -1,13 +1,14 @@
 /**
- * Nagpapalawak sa raw Node.js response object gamit ang dagdag na helper methods.
- * @param {import("http").ServerResponse} res - Ang raw response object mula sa http.createServer.
- * @returns {import("http").ServerResponse} Yung parehong res object, may bagong methods na.
+ * Enhances the raw Node.js response object with additional helper methods.
+ * @param {import("http").ServerResponse} res - The raw response object from http.createServer.
+ * @param {import("http").IncomingMessage} req - The raw request object, used to detect HEAD requests.
+ * @returns {import("http").ServerResponse} The same res object, now with the new methods.
  */
-export function enhanceResponse(res) {
+export function enhanceResponse(res, req) {
   /**
-   * Nagse-set ng HTTP status code, chainable.
-   * @param {number} code - HTTP status code (hal. 200, 404, 500).
-   * @returns {import("http").ServerResponse} Yung res mismo, para pwedeng i-chain (res.status(404).send(...)).
+   * Sets the HTTP status code, chainable.
+   * @param {number} code - HTTP status code (e.g. 200, 404, 500).
+   * @returns {import("http").ServerResponse} res itself, so it can be chained (res.status(404).send(...)).
    */
   res.status = (code) => {
     res.statusCode = code;
@@ -15,9 +16,26 @@ export function enhanceResponse(res) {
   };
 
   /**
-   * Nagpapadala ng response. Auto-detect kung JSON o plain text ang ipapadala
-   * batay sa type ng data.
-   * @param {any} data - Ang ipapadalang laman ng response.
+   * Ends the response following the HTTP spec for HEAD requests: sets
+   * Content-Length as if the body were sent, but omits the actual body.
+   * @param {string} body - The fully-serialized response body.
+   * @returns {void}
+   */
+  function sendBody(body) {
+    res.setHeader("Content-Length", Buffer.byteLength(body));
+
+    if (req && req.method === "HEAD") {
+      // HEAD must report the same headers a GET would, but without a body
+      res.end();
+    } else {
+      res.end(body);
+    }
+  }
+
+  /**
+   * Sends a response. Auto-detects whether to send JSON or plain text
+   * based on the type of the data.
+   * @param {any} data - The content to send in the response.
    * @returns {void}
    */
   res.send = (data) => {
@@ -25,21 +43,21 @@ export function enhanceResponse(res) {
 
     if (data !== null && typeof data === "object") {
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(data));
+      sendBody(JSON.stringify(data));
     } else {
       res.setHeader("Content-Type", "text/plain");
-      res.end(String(data));
+      sendBody(String(data));
     }
   };
 
   /**
-   * Nagpapadala ng response bilang JSON, hindi na kailangan i-check ang type.
-   * @param {Object} data - Ang object na i-se-serialize papuntang JSON.
+   * Sends a response as JSON, without needing to check the data type.
+   * @param {Object} data - The object to serialize to JSON.
    * @returns {void}
    */
   res.json = (data) => {
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify(data));
+    sendBody(JSON.stringify(data));
   };
 
   return res;

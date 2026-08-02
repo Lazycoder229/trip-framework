@@ -1,15 +1,14 @@
 import { Trip } from "./index.js";
+import helmet from "helmet";
+import cors from "cors";
 
-import  userRouter  from "./router.js";
 const app = new Trip(3000);
 
-// i-mount lahat papunta sa main app
-app.use(userRouter);
+app.use(helmet());  // nagdadagdag ng security headers (XSS protection, CSP, atbp)
+app.use(cors());    // nagpapahintulot ng cross-origin requests mula sa lahat ng domain
 
-
-// pwede pa rin direkta sa app kung gusto
 app.get("/", (req, res) => {
-  res.send("Trip server is running");
+  res.send("Hello");
 });
 
 app.listen();

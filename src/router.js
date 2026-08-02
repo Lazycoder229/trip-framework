@@ -1,12 +1,12 @@
 /**
- * Naghahawak ng listahan ng routes bawat HTTP method, at nagma-match ng
- * incoming requests sa tamang handler. Pwedeng gumawa ng maraming instance
- * (hal. isa bawat "module" ng app) tapos i-mount sa Server gamit ang .use().
+ * Holds a list of routes per HTTP method, and matches incoming requests
+ * to the correct handler. Multiple instances can be created (e.g. one per
+ * "module" of the app) and then mounted onto a Trip instance via .use().
  */
 export class Router {
   /**
-   * @param {string} [prefix=""] - Path prefix na idadagdag sa lahat ng routes
-   *   ng instance na ito (hal. "/users" para sa lahat ng user-related routes).
+   * @param {string} [prefix=""] - Path prefix added to all routes registered
+   *   on this instance (e.g. "/users" for all user-related routes).
    */
   constructor(prefix = "") {
     this.prefix = prefix;
@@ -20,11 +20,11 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng isang route sa ilalim ng partikular na HTTP method.
-   * @param {"GET"|"POST"|"PUT"|"DELETE"|"PATCH"} method - Ang HTTP method.
-   * @param {string} path - Ang route path (kasama na ang prefix sa huli).
+   * Registers a route under a specific HTTP method.
+   * @param {"GET"|"POST"|"PUT"|"DELETE"|"PATCH"} method - The HTTP method.
+   * @param {string} path - The route path (prefix will be prepended).
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
-   *   Ang function na tatakbo kapag na-match ang route na ito.
+   *   The function to run when this route matches.
    * @returns {void}
    */
   add(method, path, handler) {
@@ -33,10 +33,10 @@ export class Router {
   }
 
   /**
-   * Pinagsasama ang prefix at path nang walang duplicate na slashes.
-   * @param {string} prefix - Ang path prefix ng router instance.
-   * @param {string} path - Ang path na idadagdag sa prefix.
-   * @returns {string} Ang buong pinagsamang path.
+   * Joins a prefix and a path together without producing duplicate slashes.
+   * @param {string} prefix - The router instance's path prefix.
+   * @param {string} path - The path to append to the prefix.
+   * @returns {string} The combined full path.
    */
   _joinPath(prefix, path) {
     const combined = `${prefix}${path}`;
@@ -44,9 +44,9 @@ export class Router {
   }
 
   /**
-   * Kinokopya ang lahat ng routes ng ibang Router instance papunta dito.
-   * Ginagamit ito ng Server.use() para i-mount ang mga sub-router.
-   * @param {Router} otherRouter - Ang Router instance na i-mo-merge.
+   * Copies all routes from another Router instance into this one.
+   * Used by Trip.use() to mount sub-routers.
+   * @param {Router} otherRouter - The Router instance to merge in.
    * @returns {void}
    */
   merge(otherRouter) {
@@ -56,8 +56,8 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng GET route.
-   * @param {string} path - Ang route path.
+   * Registers a GET route.
+   * @param {string} path - The route path.
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    * @returns {void}
    */
@@ -66,8 +66,8 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng POST route.
-   * @param {string} path - Ang route path.
+   * Registers a POST route.
+   * @param {string} path - The route path.
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    * @returns {void}
    */
@@ -76,8 +76,8 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng PUT route.
-   * @param {string} path - Ang route path.
+   * Registers a PUT route.
+   * @param {string} path - The route path.
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    * @returns {void}
    */
@@ -86,8 +86,8 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng DELETE route.
-   * @param {string} path - Ang route path.
+   * Registers a DELETE route.
+   * @param {string} path - The route path.
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    * @returns {void}
    */
@@ -96,8 +96,8 @@ export class Router {
   }
 
   /**
-   * Nagrerehistro ng PATCH route.
-   * @param {string} path - Ang route path.
+   * Registers a PATCH route.
+   * @param {string} path - The route path.
    * @param {(req: import("http").IncomingMessage, res: import("http").ServerResponse) => any} handler
    * @returns {void}
    */
@@ -106,14 +106,17 @@ export class Router {
   }
 
   /**
-   * Hinahanap ang route na tumutugma sa method at pathname.
-   * Simple exact match muna; balang araw pwede pang idagdag ang :params support.
-   * @param {string} method - Ang HTTP method ng incoming request.
-   * @param {string} pathname - Ang pathname ng incoming request.
-   * @returns {{ path: string, handler: Function } | null} Ang natagpuang route, o null kung wala.
+   * Finds the route that matches the given method and pathname.
+   * HEAD requests automatically fall back to matching GET routes, since
+   * HEAD is expected to behave like GET but without a response body.
+   * Simple exact match for now; :param support may be added later.
+   * @param {string} method - The HTTP method of the incoming request.
+   * @param {string} pathname - The pathname of the incoming request.
+   * @returns {{ path: string, handler: Function } | null} The matched route, or null if none found.
    */
   match(method, pathname) {
-    const routeList = this.routes[method] || [];
+    const lookupMethod = method === "HEAD" ? "GET" : method;
+    const routeList = this.routes[lookupMethod] || [];
     return routeList.find((route) => route.path === pathname) || null;
   }
 }
