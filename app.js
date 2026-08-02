@@ -10,5 +10,7 @@ app.use(cors());    // nagpapahintulot ng cross-origin requests mula sa lahat ng
 app.get("/", (req, res) => {
   res.send("Hello");
 });
-
+app.get("/users/:id", (req, res) => {
+  res.json({ id: req.params.id });
+});
 app.listen();

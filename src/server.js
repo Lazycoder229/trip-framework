@@ -133,6 +133,7 @@ export class Trip {
       return;
     }
 
+    req.params = route.params;
     try {
       // read the body for POST/PUT/PATCH before running the handler
       if (["POST", "PUT", "PATCH"].includes(method)) {

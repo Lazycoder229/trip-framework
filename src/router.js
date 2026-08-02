@@ -39,20 +39,23 @@ export class Router {
    * @param {string} path - The full path pattern, dashes/prefix already applied.
    * @returns {{ regex: RegExp, paramNames: string[] }}
    */
-  _compilePath(path) {
-    const paramNames = [];
+ // router.js
+_compilePath(path) {
+  const paramNames = [];
 
-    // escape regex special chars first, then swap ":name" segments for a
-    // capture group that stops at the next "/" (so params can't span segments)
-    const pattern = path
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&") // escape literal regex chars
-      .replace(/\\:([A-Za-z0-9_]+)/g, (_, name) => {
-        paramNames.push(name);
+  const pattern = path
+    .split("/")
+    .map((segment) => {
+      if (segment.startsWith(":")) {
+        paramNames.push(segment.slice(1)); // alisin yung ":" prefix, kunin lang pangalan
         return "([^/]+)";
-      });
+      }
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape literal segments lang
+    })
+    .join("/");
 
-    return { regex: new RegExp(`^${pattern}$`), paramNames };
-  }
+  return { regex: new RegExp(`^${pattern}$`), paramNames };
+}
 
   /**
    * Joins a prefix and a path together without producing duplicate slashes.
